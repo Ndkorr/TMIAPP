@@ -27,6 +27,8 @@ pip install pandas
 pip install python-pptx
 pip install PyPDF2
 pip install PyMuPDF
+pip install python-docx
+pip install pillow python-pptx
 
 echo Installation complete!
 pause

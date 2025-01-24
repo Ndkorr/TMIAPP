@@ -1,37 +1,23 @@
 import base64
 import json
 import os
-from tkinter import Tk, filedialog, Label, Button, Text, Scrollbar, Frame, messagebox
+from tkinter import Tk, filedialog, Label, Button, Text, Scrollbar, Frame, messagebox, Toplevel
 import fitz  # PyMuPDF for PDFs
 import pandas as pd
 from pptx import Presentation
 
-
 # Main GUI Viewer Class
 class CustomFileViewer:
-    def __init__(self, root):
-        self.root = root
-        self.root.title("Custom File Viewer")
-        self.root.geometry("800x600")
+    def __init__(self, root=None):
+        if root:
+            self.root = root
+            self.root.withdraw()
+        else:
+            self.root = Tk()
+            self.root.withdraw()  # Hide the main Tkinter window
 
-        # GUI Layout
-        Label(root, text="Custom File Viewer", font=("Arial", 20)).pack(pady=10)
-        Button(root, text="Open .myext File", command=self.open_file).pack(pady=10)
-
-        # File info display
-        self.file_info = Label(root, text="", font=("Arial", 12), fg="blue")
-        self.file_info.pack()
-
-        # Frame for content display
-        self.content_frame = Frame(root)
-        self.content_frame.pack(fill="both", expand=True)
-
-        self.text_display = Text(self.content_frame, wrap="word")
-        self.scrollbar = Scrollbar(self.content_frame, command=self.text_display.yview)
-        self.text_display.configure(yscrollcommand=self.scrollbar.set)
-
-        self.text_display.pack(side="left", fill="both", expand=True)
-        self.scrollbar.pack(side="right", fill="y")
+        # Directly open file dialog and process the file
+        self.open_file()
 
     def open_file(self):
         file_path = filedialog.askopenfilename(
@@ -39,10 +25,26 @@ class CustomFileViewer:
             filetypes=(("Custom Files", "*.myext"), ("All Files", "*.*"))
         )
         if file_path:
-            self.process_file(file_path)
+            self.open_viewer_window(file_path)
 
-    def process_file(self, custom_file_path):
+    def open_viewer_window(self, custom_file_path):
+        viewer_window = Toplevel(self.root)
+        viewer_window.title("File Viewer")
+        viewer_window.geometry("800x600")
+
+        text_display = Text(viewer_window, wrap="word")
+        scrollbar = Scrollbar(viewer_window, command=text_display.yview)
+        text_display.configure(yscrollcommand=scrollbar.set)
+
+        text_display.pack(side="left", fill="both", expand=True)
+        scrollbar.pack(side="right", fill="y")
+
         try:
+             # Handle window close event
+            def on_closing():
+                self.root.quit()
+                self.root.destroy()
+
             # Read and decode the .myext file
             with open(custom_file_path, "r") as custom_file:
                 data = json.load(custom_file)
@@ -57,68 +59,71 @@ class CustomFileViewer:
             with open(output_file, "wb") as original_file:
                 original_file.write(decoded_content)
 
-            # Update GUI with file info
-            self.file_info.config(text=f"Viewing: {output_file}")
-
             # Display content based on file type
             if original_type == "pdf":
-                self.display_pdf(output_file)
+                self.display_pdf(output_file, text_display)
             elif original_type == "xlsx":
-                self.display_excel(output_file)
+                self.display_excel(output_file, text_display)
             elif original_type == "pptx":
-                self.display_ppt(output_file)
+                self.display_ppt(output_file, text_display)
             elif original_type == "docx":
-                self.display_docx(output_file)    
+                self.display_docx(output_file, text_display)
             else:
                 messagebox.showinfo("Unsupported File", f"File type '{original_type}' is not supported for viewing.")
+                return
+                
+
+            viewer_window.protocol("WM_DELETE_WINDOW", on_closing)
         except Exception as e:
             messagebox.showerror("Error", f"An error occurred: {e}")
+            self.root.quit()
+            self.root.destroy()
 
-    def display_pdf(self, pdf_path):
+    def display_pdf(self, pdf_path, text_display):
         """Display text content of a PDF file."""
         try:
             pdf_document = fitz.open(pdf_path)
             text = ""
             for page in pdf_document:
                 text += page.get_text()
-            self.text_display.delete(1.0, "end")
-            self.text_display.insert("end", text)
+            text_display.delete(1.0, "end")
+            text_display.insert("end", text)
             pdf_document.close()
         except Exception as e:
             messagebox.showerror("Error", f"Failed to display PDF: {e}")
 
-    def display_excel(self, excel_path):
+    def display_excel(self, excel_path, text_display):
         """Display the first few rows of an Excel file."""
         try:
             df = pd.read_excel(excel_path)
-            self.text_display.delete(1.0, "end")
-            self.text_display.insert("end", df.head().to_string())
+            text_display.delete(1.0, "end")
+            text_display.insert("end", df.head().to_string())
         except Exception as e:
             messagebox.showerror("Error", f"Failed to display Excel: {e}")
 
-    def display_ppt(self, ppt_path):
+    def display_ppt(self, ppt_path, text_display):
         """Display slide titles from a PowerPoint file."""
         try:
             presentation = Presentation(ppt_path)
-            self.text_display.delete(1.0, "end")
+            text_display.delete(1.0, "end")
             for i, slide in enumerate(presentation.slides):
                 title = slide.shapes.title.text if slide.shapes.title else "No Title"
-                self.text_display.insert("end", f"Slide {i + 1}: {title}\n")
+                text_display.insert("end", f"Slide {i + 1}: {title}\n")
         except Exception as e:
             messagebox.showerror("Error", f"Failed to display PowerPoint: {e}")
 
-    def display_docx(self, docx_path):
+    def display_docx(self, docx_path, text_display):
         """Display content of a Word (.docx) file."""
         try:
             from docx import Document
             document = Document(docx_path)
 
             # Clear previous content in the text display
-            self.text_display.delete(1.0, "end")
+            text_display.delete(1.0, "end")
 
             # Extract and display paragraphs
             for paragraph in document.paragraphs:
-                self.text_display.insert("end", paragraph.text + "\n")
+                text_display.insert("end", paragraph.text + "\n")
 
         except Exception as e:
             messagebox.showerror("Error", f"Failed to display Word document: {e}")
