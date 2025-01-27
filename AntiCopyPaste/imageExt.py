@@ -1,16 +1,16 @@
 import base64
 import json
 import os
-from tkinter import Tk, filedialog, Label, Button, Text, Scrollbar, Frame, messagebox, Toplevel
+from tkinter import Tk, filedialog, Button, Text, Scrollbar, messagebox, Toplevel, Canvas, Frame, NW
 import fitz  # PyMuPDF for PDFs
-import pandas as pd
-from pptx import Presentation
+from PIL import Image, ImageTk
 
 # Main GUI Viewer Class
 class CustomFileViewer:
     def __init__(self, root=None):
         if root:
             self.root = root
+            self.root.title("Custom File Viewer")
             self.root.withdraw()
         else:
             self.root = Tk()
@@ -31,16 +31,24 @@ class CustomFileViewer:
         viewer_window = Toplevel(self.root)
         viewer_window.title("File Viewer")
         viewer_window.geometry("800x600")
+        viewer_window.update_idletasks()
+        width = viewer_window.winfo_width()
+        height = viewer_window.winfo_height()
+        x = (viewer_window.winfo_screenwidth() // 2) - (width // 2)
+        y = (viewer_window.winfo_screenheight() // 2) - (height // 2)
+        viewer_window.geometry(f'{width}x{height}+{x}+{y}')
 
-        text_display = Text(viewer_window, wrap="word")
-        scrollbar = Scrollbar(viewer_window, command=text_display.yview)
-        text_display.configure(yscrollcommand=scrollbar.set)
+        # Canvas for rendering pages
+        self.canvas = Canvas(viewer_window, bg="white")
+        self.canvas.pack(side="left", fill="both", expand=True)
 
-        text_display.pack(side="left", fill="both", expand=True)
-        scrollbar.pack(side="right", fill="y")
+        # Scrollbar
+        self.scrollbar = Scrollbar(viewer_window, orient="vertical", command=self.canvas.yview)
+        self.scrollbar.pack(side="right", fill="y")
+        self.canvas.configure(yscrollcommand=self.scrollbar.set)
 
         try:
-             # Handle window close event
+            # Handle window close event
             def on_closing():
                 self.root.quit()
                 self.root.destroy()
@@ -61,17 +69,12 @@ class CustomFileViewer:
 
             # Display content based on file type
             if original_type == "pdf":
-                self.display_pdf(output_file, text_display)
-            elif original_type == "xlsx":
-                self.display_excel(output_file, text_display)
-            elif original_type == "pptx":
-                self.display_ppt(output_file, text_display)
-            elif original_type == "docx":
-                self.display_docx(output_file, text_display)
+                self.display_pdf(output_file)
             else:
-                messagebox.showinfo("Unsupported File", f"File type '{original_type}' is not supported for viewing.")
+                messagebox.showinfo("Unsupported File", f"File type is not supported for viewing.")
+                self.root.quit()
+                self.root.destroy()
                 return
-                
 
             viewer_window.protocol("WM_DELETE_WINDOW", on_closing)
         except Exception as e:
@@ -79,54 +82,56 @@ class CustomFileViewer:
             self.root.quit()
             self.root.destroy()
 
-    def display_pdf(self, pdf_path, text_display):
-        """Display text content of a PDF file."""
+    def display_pdf(self, pdf_path):
+        """Render a PDF document."""
         try:
+            self.pages = []  # Clear any previous pages
+            self.page_images = []  # Store references to PhotoImage objects
             pdf_document = fitz.open(pdf_path)
-            text = ""
-            for page in pdf_document:
-                text += page.get_text()
-            text_display.delete(1.0, "end")
-            text_display.insert("end", text)
-            pdf_document.close()
+
+            for page_num in range(len(pdf_document)):
+                page = pdf_document[page_num]
+                pix = page.get_pixmap()
+                image = Image.frombytes("RGB", [pix.width, pix.height], pix.samples)
+                self.pages.append(image)
+
+            self.render_all_pages()
         except Exception as e:
-            messagebox.showerror("Error", f"Failed to display PDF: {e}")
+            messagebox.showerror("Error", f"Failed to render PDF: {e}")
 
-    def display_excel(self, excel_path, text_display):
-        """Display the first few rows of an Excel file."""
-        try:
-            df = pd.read_excel(excel_path)
-            text_display.delete(1.0, "end")
-            text_display.insert("end", df.head().to_string())
-        except Exception as e:
-            messagebox.showerror("Error", f"Failed to display Excel: {e}")
+    def render_all_pages(self):
+        """Render all pages on the canvas."""
+        y_position = 10  # Initial y position for the first page
 
-    def display_ppt(self, ppt_path, text_display):
-        """Display slide titles from a PowerPoint file."""
-        try:
-            presentation = Presentation(ppt_path)
-            text_display.delete(1.0, "end")
-            for i, slide in enumerate(presentation.slides):
-                title = slide.shapes.title.text if slide.shapes.title else "No Title"
-                text_display.insert("end", f"Slide {i + 1}: {title}\n")
-        except Exception as e:
-            messagebox.showerror("Error", f"Failed to display PowerPoint: {e}")
+        canvas_width = self.canvas.winfo_width()
+        canvas_height = self.canvas.winfo_height()
 
-    def display_docx(self, docx_path, text_display):
-        """Display content of a Word (.docx) file."""
-        try:
-            from docx import Document
-            document = Document(docx_path)
+        for page_image in self.pages:
+            # Calculate the scaling factor to fit the image within the canvas
+            scale_factor = min(canvas_width / page_image.width, canvas_height / page_image.height, 1)
+            new_width = int(page_image.width * scale_factor)
+            new_height = int(page_image.height * scale_factor)
+            resized_image = page_image.resize((new_width, new_height), Image.LANCZOS)
 
-            # Clear previous content in the text display
-            text_display.delete(1.0, "end")
+            page_tk = ImageTk.PhotoImage(resized_image)
+            self.page_images.append(page_tk)  # Keep a reference to avoid garbage collection
 
-            # Extract and display paragraphs
-            for paragraph in document.paragraphs:
-                text_display.insert("end", paragraph.text + "\n")
+            # Calculate the x position to center the page
+            x_position = (canvas_width - new_width) // 2
 
-        except Exception as e:
-            messagebox.showerror("Error", f"Failed to display Word document: {e}")
+            self.canvas.create_image(x_position, y_position, anchor=NW, image=page_tk)
+            y_position += new_height + 10  # Update y position for the next page
+
+        # Update the scroll region to include all pages
+        self.canvas.config(scrollregion=self.canvas.bbox("all"))
+
+        # Bind the configure event to update the canvas size dynamically
+        self.canvas.bind("<Configure>", self.on_canvas_configure)
+
+    def on_canvas_configure(self, event):
+        """Update the canvas when the window is resized."""
+        self.canvas.delete("all")
+        self.render_all_pages()
 
 # Run the GUI application
 if __name__ == "__main__":
