@@ -29,6 +29,6 @@ pip install PyPDF2
 pip install PyMuPDF
 pip install python-docx
 pip install pillow python-pptx
-
+pip install PyQt5
 echo Installation complete!
 pause
