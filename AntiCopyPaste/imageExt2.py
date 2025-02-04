@@ -1,7 +1,7 @@
 import base64
 import json
 import sys
-from PyQt5.QtWidgets import QDesktopWidget, QApplication, QMainWindow, QFileDialog, QLabel, QVBoxLayout, QWidget, QScrollArea, QMessageBox, QPushButton
+from PyQt5.QtWidgets import QDesktopWidget, QApplication, QMainWindow, QFileDialog, QLabel, QVBoxLayout, QWidget, QScrollArea, QMessageBox, QMenuBar, QMenu, QAction, QListWidget, QListWidgetItem
 from PyQt5.QtGui import QPixmap, QImage, QPainter
 from PyQt5.QtCore import Qt
 from PyQt5.QtPrintSupport import QPrinter, QPrintDialog
@@ -25,11 +25,37 @@ class CustomFileViewer(QMainWindow):
         self.layout.setAlignment(Qt.AlignmentFlag.AlignVCenter)
         self.scroll_area.setWidget(self.container)
 
-        # Add a print button
-        self.print_button = QPushButton("Print", self)
-        self.print_button.clicked.connect(self.print_document)
-        self.layout.addWidget(self.print_button)
+         # Add a menu bar
+        self.menu_bar = QMenuBar(self)
+        self.setMenuBar(self.menu_bar)
 
+        # Add a "File" menu
+        self.file_menu = QMenu("File", self)
+        self.menu_bar.addMenu(self.file_menu)
+
+        # Add a "Print" action to the "File" menu
+        self.print_action = QAction("Print", self)
+        self.print_action.triggered.connect(self.print_document)
+        self.file_menu.addAction(self.print_action)
+        
+        # Add a "Open" action to the "File" menu
+        self.open_action = QAction("Open", self)
+        self.open_action.triggered.connect(self.open_file)
+        self.file_menu.addAction(self.open_action)
+        
+        # Add a "About" menu
+        self.about_menu = QMenu("About", self)
+        self.menu_bar.addMenu(self.about_menu)
+
+        self.about_action = QAction("Info", self)
+        self.about_action.triggered.connect(self.about)
+        self.about_menu.addAction(self.about_action)
+        
+        #Add a "Exit" action to the "File" menu
+        self.exit_action = QAction("Exit", self)
+        self.exit_action.triggered.connect(self.close)
+        self.file_menu.addAction(self.exit_action)
+        
     def open_file(self):
         try:
             file_path, _ = QFileDialog.getOpenFileName(self, "Select a Custom File", "", "Custom Files (*.myext);;All Files (*)")
@@ -277,6 +303,9 @@ class CustomFileViewer(QMainWindow):
         window_geometry.moveCenter(screen_geometry.center())  # Move to center
         self.move(window_geometry.topLeft())  # Apply new position
 
+    def about(self):
+        QMessageBox.about(self, "About this Application",
+                          "This application/system is monitored by QFS DEPARTMENT")
 if __name__ == "__main__":
     app = QApplication([])
     viewer = CustomFileViewer()
