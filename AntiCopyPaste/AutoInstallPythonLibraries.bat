@@ -26,9 +26,10 @@ pip install openpyxl
 pip install pandas
 pip install python-pptx
 pip install PyPDF2
-pip install PyMuPDF
+pip install pymupdf
 pip install python-docx
-pip install pillow python-pptx
+pip install pillow
+pip install python-pptx
 
 echo Installation complete!
 pause

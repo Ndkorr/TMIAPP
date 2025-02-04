@@ -1,10 +1,9 @@
 import base64
 import json
 import os
-from tkinter import Tk, filedialog, Button, Text, Scrollbar, messagebox, Toplevel, Canvas, Frame, NW
-import fitz  # PyMuPDF for PDFs
+from tkinter import Tk, filedialog, Scrollbar, messagebox, Toplevel, Canvas, Frame, NW
 from PIL import Image, ImageTk
-
+import fitz
 # Main GUI Viewer Class
 class CustomFileViewer:
     def __init__(self, root=None):
