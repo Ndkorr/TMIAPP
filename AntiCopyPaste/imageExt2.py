@@ -1,8 +1,8 @@
 import base64
 import json
 import sys
-from PyQt5.QtWidgets import QDesktopWidget, QApplication, QMainWindow, QFileDialog, QLabel, QVBoxLayout, QWidget, QScrollArea, QMessageBox, QMenuBar, QMenu, QAction, QListWidget, QListWidgetItem
-from PyQt5.QtGui import QPixmap, QImage, QPainter
+from PyQt5.QtWidgets import QDesktopWidget, QApplication, QMainWindow, QFileDialog, QLabel, QVBoxLayout, QWidget, QScrollArea, QMessageBox, QMenuBar, QMenu, QAction, QTabWidget
+from PyQt5.QtGui import QPixmap, QImage, QPainter, QIcon
 from PyQt5.QtCore import Qt
 from PyQt5.QtPrintSupport import QPrinter, QPrintDialog
 import fitz  # PyMuPDF for PDFs
@@ -16,16 +16,17 @@ class CustomFileViewer(QMainWindow):
         self.setGeometry(100, 100, 800, 600)
         self.center_window()
 
-        self.scroll_area = QScrollArea(self)
-        self.scroll_area.setWidgetResizable(True)
-        self.setCentralWidget(self.scroll_area)
+        # Change the window icon
+        # self.setWindowIcon(QIcon('path/to/your/icon.png'))  # Change the icon
+        self.setWindowIcon(QIcon())  # Remove the icon
+        
+        self.tab_widget = QTabWidget(self)
+        self.tab_widget.setTabsClosable(True)
+        self.tab_widget.tabCloseRequested.connect(self.close_tab)
+        self.setCentralWidget(self.tab_widget)
+        
 
-        self.container = QWidget()
-        self.layout = QVBoxLayout(self.container)
-        self.layout.setAlignment(Qt.AlignmentFlag.AlignVCenter)
-        self.scroll_area.setWidget(self.container)
-
-         # Add a menu bar
+        # Add a menu bar
         self.menu_bar = QMenuBar(self)
         self.setMenuBar(self.menu_bar)
 
@@ -51,21 +52,34 @@ class CustomFileViewer(QMainWindow):
         self.about_action.triggered.connect(self.about)
         self.about_menu.addAction(self.about_action)
         
-        #Add a "Exit" action to the "File" menu
+        # Add a "Toggle Theme" action to the "File" menu
+        self.dark_mode = False
+        self.toggle_theme_action = QAction("Dark Mode", self)
+        self.toggle_theme_action.triggered.connect(self.toggle_theme)
+        self.file_menu.addAction(self.toggle_theme_action)
+        
+        # Add an "Exit" action to the "File" menu
         self.exit_action = QAction("Exit", self)
         self.exit_action.triggered.connect(self.close)
         self.file_menu.addAction(self.exit_action)
         
+
     def open_file(self):
         try:
-            file_path, _ = QFileDialog.getOpenFileName(self, "Select a Custom File", "", "Custom Files (*.myext);;All Files (*)")
-            if file_path:
-                self.open_viewer_window(file_path)
-                self.show()  # Show the main window only if a file is selected
+            file_paths, _ = QFileDialog.getOpenFileNames(self, "Select Custom Files", "", "Custom Files (*.myext);;All Files (*)")
+            if file_paths:
+                for file_path in file_paths:
+                    self.open_viewer_window(file_path)
+                self.show()  # Show the main window only if files are selected
+            
+            elif self.isVisible():
+                self.show()
+            
             else:
                 QMessageBox.information(self, "No File Selected", "No file was selected. Exiting the application.")
                 QApplication.instance().quit()  # Ensure the application exits completely
                 sys.exit()
+                
         except Exception as e:
             QMessageBox.critical(self, "Error", f"An error occurred: {e}")
             QApplication.instance().quit()  # Ensure the application exits completely
@@ -92,9 +106,26 @@ class CustomFileViewer(QMainWindow):
             with open(output_file, "wb") as original_file:
                 original_file.write(decoded_content)
 
+            # Create a new tab for the file
+            tab = QWidget()
+            layout = QVBoxLayout(tab)
+            layout.setAlignment(Qt.AlignmentFlag.AlignVCenter)
+            scroll_area = QScrollArea(tab)
+            scroll_area.setWidgetResizable(True)
+            container = QWidget()
+            container_layout = QVBoxLayout(container)
+            container_layout.setAlignment(Qt.AlignmentFlag.AlignVCenter)
+            scroll_area.setWidget(container)
+            layout.addWidget(scroll_area)
+            self.tab_widget.addTab(tab, file_name.replace(".pdf", ""))
+
             # Display content based on file type
             if original_type == "pdf":
-                self.display_pdf(output_file)
+                self.display_pdf(output_file, container_layout)
+            
+            elif self.isVisible():
+                QMessageBox.information(self, "Unsupported File", "File type is not supported for viewing.")
+                
             else:
                 QMessageBox.information(self, "Unsupported File", "File type is not supported for viewing.")
                 QApplication.instance().quit()  # Ensure the application exits completely
@@ -104,18 +135,18 @@ class CustomFileViewer(QMainWindow):
             QApplication.instance().quit()  # Ensure the application exits completely
             sys.exit()
 
-    def display_pdf(self, pdf_path):
+    def display_pdf(self, pdf_path, layout):
         """Render a PDF document."""
         try:
-            self.pages = []  # Clear any previous pages
-            self.page_dimensions = []  # Store original dimensions
+            pages = []  # Clear any previous pages
+            page_dimensions = []  # Store original dimensions
             pdf_document = fitz.open(pdf_path)
 
             for page_num in range(len(pdf_document)):
                 page = pdf_document[page_num]
                 pix = page.get_pixmap()
                 image = Image.frombytes("RGB", [pix.width, pix.height], pix.samples)
-                self.pages.append(image)
+                pages.append(image)
 
                 # Get original dimensions in points (1 point = 1/72 inch)
                 width_points = page.mediabox.width
@@ -125,13 +156,13 @@ class CustomFileViewer(QMainWindow):
                 width_cm = width_points * 0.0352778
                 height_cm = height_points * 0.0352778
 
-                self.page_dimensions.append((width_cm, height_cm))
+                page_dimensions.append((width_cm, height_cm))
 
-            self.render_all_pages()
+            self.render_all_pages(pages, page_dimensions, layout)
         except Exception as e:
             QMessageBox.critical(self, "Error", f"Failed to render PDF: {e}")
 
-    def render_all_pages(self):
+    def render_all_pages(self, pages, page_dimensions, layout):
         """Render all pages on the canvas."""
         max_width_portrait = 800
         max_height_portrait = 1000
@@ -140,7 +171,7 @@ class CustomFileViewer(QMainWindow):
 
         tolerance = 0.1  # Tolerance for dimension comparison
 
-        for page_num, (page_image, (width_cm, height_cm)) in enumerate(zip(self.pages, self.page_dimensions)):
+        for page_num, (page_image, (width_cm, height_cm)) in enumerate(zip(pages, page_dimensions)):
             # Determine the maximum dimensions based on orientation
             if page_image.width > page_image.height:
                 max_width = max_width_landscape
@@ -165,118 +196,118 @@ class CustomFileViewer(QMainWindow):
             label = QLabel(self)
             label.setPixmap(pixmap)
             label.setAlignment(Qt.AlignCenter)
-            self.layout.addWidget(label)
+            layout.addWidget(label)
 
             # Display the page number
             page_label = QLabel(f"Page {page_num + 1}", self)
             page_label.setAlignment(Qt.AlignCenter)
-            self.layout.addWidget(page_label)
+            layout.addWidget(page_label)
 
             # Display the original size of the file in centimeters
             if abs(width_cm - 21.59) < tolerance and abs(height_cm - 27.94) < tolerance:
                 size_label = QLabel(f"Size: {width_cm:.2f} cm x {height_cm:.2f} cm (Letter: 8.5' x 11')", self)
                 size_label.setAlignment(Qt.AlignCenter)
-                self.layout.addWidget(size_label)
+                layout.addWidget(size_label)
             
             elif abs(width_cm - 21.59) < tolerance and abs(height_cm - 35.56) < tolerance:
                 size_label = QLabel(f"Size: {width_cm:.2f} cm x {height_cm:.2f} cm (Legal: 8.5' x 14')", self)
                 size_label.setAlignment(Qt.AlignCenter)
-                self.layout.addWidget(size_label)
+                layout.addWidget(size_label)
             
             elif abs(width_cm - 14.8) < tolerance and abs(height_cm - 21) < tolerance:
                 size_label = QLabel(f"Size: {width_cm:.2f} cm x {height_cm:.2f} cm (A5)", self)
                 size_label.setAlignment(Qt.AlignCenter)
-                self.layout.addWidget(size_label)
+                layout.addWidget(size_label)
             
             elif abs(width_cm - 21) < tolerance and abs(height_cm - 29.7) < tolerance:
                 size_label = QLabel(f"Size: {width_cm:.2f} cm x {height_cm:.2f} cm (A4)", self)
                 size_label.setAlignment(Qt.AlignCenter)
-                self.layout.addWidget(size_label)
+                layout.addWidget(size_label)
             
             elif abs(width_cm - 29.7) < tolerance and abs(height_cm - 42) < tolerance:
                 size_label = QLabel(f"Size: {width_cm:.2f} cm x {height_cm:.2f} cm (A3)", self)
                 size_label.setAlignment(Qt.AlignCenter)
-                self.layout.addWidget(size_label)
+                layout.addWidget(size_label)
 
             elif abs(width_cm - 42) < tolerance and abs(height_cm - 59.4) < tolerance:
                 size_label = QLabel(f"Size: {width_cm:.2f} cm x {height_cm:.2f} cm (A2)", self)
                 size_label.setAlignment(Qt.AlignCenter)
-                self.layout.addWidget(size_label)
+                layout.addWidget(size_label)
             
             elif abs(width_cm - 59.4) < tolerance and abs(height_cm - 84.1) < tolerance:
                 size_label = QLabel(f"Size: {width_cm:.2f} cm x {height_cm:.2f} cm (A1)", self)
                 size_label.setAlignment(Qt.AlignCenter)
-                self.layout.addWidget(size_label)
+                layout.addWidget(size_label)
 
             elif abs(width_cm - 84.1) < tolerance and abs(height_cm - 118.9) < tolerance:
                 size_label = QLabel(f"Size: {width_cm:.2f} cm x {height_cm:.2f} cm (A0)", self)
                 size_label.setAlignment(Qt.AlignCenter)
-                self.layout.addWidget(size_label)
+                layout.addWidget(size_label)
             
             elif abs(width_cm - 10.5) < tolerance and abs(height_cm - 14.8) < tolerance:
                 size_label = QLabel(f"Size: {width_cm:.2f} cm x {height_cm:.2f} cm (A6)", self)
                 size_label.setAlignment(Qt.AlignCenter)
-                self.layout.addWidget(size_label)
+                layout.addWidget(size_label)
             
             elif abs(width_cm - 12.7) < tolerance and abs(height_cm - 17.8) < tolerance:
                 size_label = QLabel(f"Size: {width_cm:.2f} cm x {height_cm:.2f} cm (5' x 7')", self)
                 size_label.setAlignment(Qt.AlignCenter)
-                self.layout.addWidget(size_label)
+                layout.addWidget(size_label)
 
             elif abs(width_cm - 15.2) < tolerance and abs(height_cm - 20.3) < tolerance:
                 size_label = QLabel(f"Size: {width_cm:.2f} cm x {height_cm:.2f} cm (6' x 8')", self)
                 size_label.setAlignment(Qt.AlignCenter)
-                self.layout.addWidget(size_label)
+                layout.addWidget(size_label)
             
             elif abs(width_cm - 20.3) < tolerance and abs(height_cm - 25.4) < tolerance:
                 size_label = QLabel(f"Size: {width_cm:.2f} cm x {height_cm:.2f} cm (8' x 10')", self)
                 size_label.setAlignment(Qt.AlignCenter)
-                self.layout.addWidget(size_label)
+                layout.addWidget(size_label)
             
             elif abs(width_cm - 25.4) < tolerance and abs(height_cm - 30.5) < tolerance:
                 size_label = QLabel(f"Size: {width_cm:.2f} cm x {height_cm:.2f} cm (10' x 12')", self)
                 size_label.setAlignment(Qt.AlignCenter)
-                self.layout.addWidget(size_label)
+                layout.addWidget(size_label)
             
             elif abs(width_cm - 30.5) < tolerance and abs(height_cm - 40.6) < tolerance:
                 size_label = QLabel(f"Size: {width_cm:.2f} cm x {height_cm:.2f} cm (12' x 16')", self)
                 size_label.setAlignment(Qt.AlignCenter)
-                self.layout.addWidget(size_label)
+                layout.addWidget(size_label)
             
             elif abs(width_cm - 40.6) < tolerance and abs(height_cm - 50.8) < tolerance:
                 size_label = QLabel(f"Size: {width_cm:.2f} cm x {height_cm:.2f} cm (16' x 20')", self)
                 size_label.setAlignment(Qt.AlignCenter)
-                self.layout.addWidget(size_label)
+                layout.addWidget(size_label)
             
             elif abs(width_cm - 50.8) < tolerance and abs(height_cm - 61) < tolerance:
                 size_label = QLabel(f"Size: {width_cm:.2f} cm x {height_cm:.2f} cm (20' x 24')", self)
                 size_label.setAlignment(Qt.AlignCenter)
-                self.layout.addWidget(size_label)
+                layout.addWidget(size_label)
             
             elif abs(width_cm - 61) < tolerance and abs(height_cm - 76.2) < tolerance:
                 size_label = QLabel(f"Size: {width_cm:.2f} cm x {height_cm:.2f} cm (24' x 30')", self)
                 size_label.setAlignment(Qt.AlignCenter)
-                self.layout.addWidget(size_label)
+                layout.addWidget(size_label)
             
             elif abs(width_cm - 76.2) < tolerance and abs(height_cm - 101.6) < tolerance:
                 size_label = QLabel(f"Size: {width_cm:.2f} cm x {height_cm:.2f} cm (30' x 40')", self)
                 size_label.setAlignment(Qt.AlignCenter)
-                self.layout.addWidget(size_label)
+                layout.addWidget(size_label)
             
             elif abs(width_cm - 101.6) < tolerance and abs(height_cm - 127) < tolerance:
                 size_label = QLabel(f"Size: {width_cm:.2f} cm x {height_cm:.2f} cm (40' x 50')", self)
                 size_label.setAlignment(Qt.AlignCenter)
-                self.layout.addWidget(size_label)
+                layout.addWidget(size_label)
             
             elif abs(width_cm - 127) < tolerance and abs(height_cm - 152.4) < tolerance:
                 size_label = QLabel(f"Size: {width_cm:.2f} cm x {height_cm:.2f} cm (50' x 60')", self)
                 size_label.setAlignment(Qt.AlignCenter)
-                self.layout.addWidget(size_label)
+                layout.addWidget(size_label)
             
             else:
                 size_label = QLabel(f"Custom Size: {width_cm:.2f} cm x {height_cm:.2f} cm", self)
                 size_label.setAlignment(Qt.AlignCenter)
-                self.layout.addWidget(size_label)
+                layout.addWidget(size_label)
 
     def print_document(self):
         """Print the displayed document."""
@@ -295,6 +326,10 @@ class CustomFileViewer(QMainWindow):
                 painter.drawPixmap(0, 0, pixmap)
                 printer.newPage()
             painter.end()
+    
+    def close_tab(self, index):
+        """Close the tab at the given index."""
+        self.tab_widget.removeTab(index)
 
     def center_window(self):
         """Centers the window on the screen."""
@@ -305,9 +340,35 @@ class CustomFileViewer(QMainWindow):
 
     def about(self):
         QMessageBox.about(self, "About this Application",
-                          "This application/system is monitored by QFS DEPARTMENT")
+                          "This application/system is monitored by QFS DEPARTMENT and ADMINISTRATOR. ")
+
+    def toggle_theme(self):
+        """Toggles between Dark Mode and Light Mode."""
+        if self.dark_mode:
+            # Light Mode
+            self.setStyleSheet("")
+            self.dark_mode = False
+        else:
+            # Dark Mode
+            dark_stylesheet = """
+                QMainWindow { background-color: #121212; color: #ffffff; }
+                QWidget { background-color: #121212; color: #ffffff; }
+                QLabel { color: #ffffff; }
+                QPushButton { background-color: #333333; color: #ffffff; border: 1px solid #555555; padding: 5px; }
+                QPushButton:hover { background-color: #444444; }
+                QPushButton:pressed { background-color: #555555; }
+                QTabWidget::pane { border: 1px solid #555555; }
+                QTabBar::tab { background-color: #333333; color: #ffffff; padding: 8px; }
+                QTabBar::tab:selected { background-color: #555555; }
+                QScrollArea { background-color: #121212; }
+            """
+            self.setStyleSheet(dark_stylesheet)
+            self.dark_mode = True
+
+
 if __name__ == "__main__":
     app = QApplication([])
+    
     viewer = CustomFileViewer()
     viewer.open_file()  # Open the file dialog before showing the main window
     app.exec_()
