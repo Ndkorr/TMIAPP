@@ -30,6 +30,6 @@ pip install pymupdf
 pip install python-docx
 pip install pillow
 pip install python-pptx
-
+pip install PyQt5
 echo Installation complete!
 pause
