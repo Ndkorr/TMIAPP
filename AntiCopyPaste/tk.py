@@ -1,7 +1,7 @@
 import base64
 import json
 import sys
-from PyQt5.QtWidgets import QDesktopWidget, QPushButton, QLineEdit, QApplication, QMainWindow, QFileDialog, QLabel, QVBoxLayout, QWidget, QScrollArea, QMessageBox, QMenuBar, QMenu, QAction, QTabWidget
+from PyQt5.QtWidgets import QDesktopWidget, QToolButton, QPushButton, QLineEdit, QApplication, QMainWindow, QFileDialog, QLabel, QVBoxLayout, QWidget, QScrollArea, QMessageBox, QMenuBar, QMenu, QAction, QTabWidget
 from PyQt5.QtGui import QPixmap, QImage, QPainter, QIcon
 from PyQt5.QtCore import Qt
 from PyQt5.QtPrintSupport import QPrinter, QPrintDialog, QPrintPreviewDialog
@@ -51,8 +51,7 @@ class CustomFileViewer(QMainWindow):
         # self.setWindowIcon(QIcon('path/to/your/icon.png'))  # Change the icon
         self.setWindowIcon(QIcon())  # Remove the icon
         
-        
-        
+        # Add a tab widget
         self.tab_widget = QTabWidget(self)
         self.tab_widget.setTabsClosable(True)
         self.tab_widget.tabCloseRequested.connect(self.close_tab)
@@ -103,9 +102,10 @@ class CustomFileViewer(QMainWindow):
     
     def print_preview(self):
         """Show a print preview dialog."""
-        preview_dialog = QPrintPreviewDialog()
-        preview_dialog.paintRequested.connect(self.print_preview_document)
-        preview_dialog.exec_()
+        self.printer = QPrinter(QPrinter.HighResolution)
+        self.preview = QPrintPreviewDialog(self.printer, self)
+        self.preview.paintRequested.connect(self.print_preview_document)
+        self.preview.exec()
         
         
     def open_file(self):
@@ -188,17 +188,17 @@ class CustomFileViewer(QMainWindow):
 
             for page_num in range(len(pdf_document)):
                 page = pdf_document[page_num]
-                pix = page.get_pixmap()
+                pix = page.get_pixmap(matrix=fitz.Matrix(3, 3))  # Render at 300 DPI
                 image = Image.frombytes("RGB", [pix.width, pix.height], pix.samples)
                 self.pages.append(image)
 
                 # Get original dimensions in points (1 point = 1/72 inch)
-                width_points = page.mediabox.width
-                height_points = page.mediabox.height
+                width_points = int(page.mediabox.width)
+                height_points = int(page.mediabox.height)
 
                 # Convert points to centimeters (1 point = 0.0352778 cm)
-                width_cm = width_points * 0.0352778
-                height_cm = height_points * 0.0352778
+                width_cm = int(width_points * 0.0352778)
+                height_cm = int(height_points * 0.0352778)
 
                 page_dimensions.append((width_cm, height_cm))
 
@@ -355,6 +355,7 @@ class CustomFileViewer(QMainWindow):
 
     def print_preview_document(self, printer):
         """Render the document for print preview."""
+        self.override_print_button()
         painter = QPainter(printer)
         for i, page_image in enumerate(self.pages):
             if i > 0:
@@ -367,10 +368,17 @@ class CustomFileViewer(QMainWindow):
             painter.setViewport(rect.x(), rect.y(), size.width(), size.height())
             painter.setWindow(pixmap.rect())
             painter.drawPixmap(0, 0, pixmap)
+
         painter.end()
         
         
-        
+    def custom_print(self):
+        """Manually handles print request when the print button is clicked."""
+        dialog = QPrintDialog(self.printer, self)
+        if dialog.exec_() == QPrintDialog.Accepted:
+            self.render_preview(self.printer)
+            
+                      
     def preview_print(self):
         """Show a print preview dialog."""
         printer = QPrinter(QPrinter.HighResolution)
@@ -380,8 +388,10 @@ class CustomFileViewer(QMainWindow):
     
         preview_dialog.exec()
     
+    
     def print_document(self):
         printer = QPrinter(QPrinter.HighResolution)
+        printer.setResolution(600)  # Set high DPI for better quality
         print_dialog = QPrintDialog(printer, self)
         print_dialog.setOption(QPrintDialog.PrintPageRange)
         
@@ -400,9 +410,11 @@ class CustomFileViewer(QMainWindow):
 
             self.print_selected_pages(printer, from_page, to_page)
             
+            
     def print_selected_pages(self, printer, from_page, to_page):
         """Print the selected pages."""
         painter = QPainter(printer)
+        
         for i in range(from_page, to_page + 1):
             if i > from_page:
                 printer.newPage()
@@ -416,6 +428,13 @@ class CustomFileViewer(QMainWindow):
             painter.setWindow(pixmap.rect())
             painter.drawPixmap(0, 0, pixmap)
         painter.end()
+    
+    def override_print_button(self):
+        """Override the print button action inside QPrintPreviewDialog."""
+        for widget in self.findChildren(QToolButton):
+            if widget.text() == "Print":
+                widget.setEnabled(False)  # Connect to custom print action
+            
     
     def close_tab(self, index):
         """Close the tab at the given index."""
