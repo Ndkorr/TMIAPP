@@ -105,6 +105,11 @@ class CustomFileViewer(QMainWindow):
         self.file_menu = QMenu("File", self)
         self.menu_bar.addMenu(self.file_menu)
 
+        # Add a "Open" action to the "File" menu
+        self.open_action = QAction("Open", self)
+        self.open_action.triggered.connect(self.open_file)
+        self.file_menu.addAction(self.open_action)
+        
         # Add a "Print" action to the "File" menu
         self.print_action = QAction("Print", self)
         self.print_action.triggered.connect(self.print_document)
@@ -114,11 +119,6 @@ class CustomFileViewer(QMainWindow):
         self.print_preview_action = QAction("Print Preview", self)
         self.print_preview_action.triggered.connect(self.print_preview)
         self.file_menu.addAction(self.print_preview_action)
-        
-        # Add a "Open" action to the "File" menu
-        self.open_action = QAction("Open", self)
-        self.open_action.triggered.connect(self.open_file)
-        self.file_menu.addAction(self.open_action)
         
         # Add a "About" menu
         self.about_menu = QMenu("About", self)
@@ -180,12 +180,18 @@ class CustomFileViewer(QMainWindow):
             decoded_content = base64.b64decode(data["content"])
 
             # Create a folder named "extracted_files" if it doesn't exist
-            extracted_folder = "extracted_files"
-            if not os.path.exists(extracted_folder):
-                os.makedirs(extracted_folder)
+            # STORE IN %APPDATA%
+            appdata_folder = os.getenv("APPDATA")
+            
+            extracted_folder = os.path.join(appdata_folder, "CFV")
+            
+            subfolder_name = "extracted files"
+            subfolder_path = os.path.join(extracted_folder, subfolder_name)
+            
+            os.makedirs(subfolder_path, exist_ok=True)
 
             # Save the extracted file locally in the "extracted_files" folder
-            output_file = os.path.join(extracted_folder, f"extracted_{file_name}")
+            output_file = os.path.join(subfolder_path, f"extracted_{file_name}")
             with open(output_file, "wb") as original_file:
                 original_file.write(decoded_content)
 
@@ -521,7 +527,7 @@ class CustomFileViewer(QMainWindow):
                 QPushButton:hover { background-color: #444444; }
                 QPushButton:pressed { background-color: #555555; }
                 QTabWidget::pane { border: 1px solid #555555; }
-                QTabBar::tab { background-color: #333333; color: #ffffff; padding: 8px; }
+                QTabBar::tab { background-color: #333333; color:rgb(255, 255, 255); padding: 8px; }
                 QTabBar::tab:selected { background-color: #555555; }
                 QScrollArea { background-color: #121212; }
             """
@@ -531,7 +537,7 @@ class CustomFileViewer(QMainWindow):
 
 if __name__ == "__main__":
     app = QApplication([])
-    app.setWindowIcon(QIcon(r"C:\Users\HR-IT-MATTHEW-PC\Desktop\Projects\Applications\AntiCopyPaste\output\iconFileViewer512.ico"))
+    app.setWindowIcon(QIcon("iconFileViewer512.ico"))
     viewer = CustomFileViewer()
     viewer.show()  # Open the file dialog before showing the main window
     app.exec_()
