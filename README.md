@@ -86,7 +86,7 @@
 
 - Printing now works
 
-## [v3.1.1] - 2025-02-22 - Release
+## [v3.1.1] - 2025-02-22 - [Release](https://github.com/Ndkorr/TMIAPP/releases/tag/v3.1.1)
 
 ### Fixes
 
