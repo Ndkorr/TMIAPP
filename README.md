@@ -85,3 +85,23 @@
 - Window scaling
 
 - Printing now works
+
+## [v3.1.1] - 2025-02-22 - Release
+
+### Fixes
+
+- Issue on not displaying the icon on the **Main window**
+
+- Readjust the installer code displaying "version 2.0.9 suffix on programs and features" _ex. CF Viewer version 2.0.9_ 
+
+- Readjust the window scaling on **How to use this application** window base on the current screen resolution
+
+- Readjust the window scaling on **Main window** base on the current screen resolution
+
+- Printing is now working smoothly
+
+### Added
+
+- Version File
+
+- Icon on installer
