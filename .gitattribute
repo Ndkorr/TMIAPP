@@ -1,0 +1,6 @@
+# Treat all .myextension files as Python
+*.myextension linguist-language=Python
+
+# Ignore large data files so they don't affect the language stats
+*.csv linguist-vendored
+*.bin linguist-vendored
