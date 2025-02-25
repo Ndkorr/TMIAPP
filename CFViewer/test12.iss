@@ -2,10 +2,13 @@
 ; SEE THE DOCUMENTATION FOR DETAILS ON CREATING INNO SETUP SCRIPT FILES!
 
 #define MyAppName "CF Viewer"
-#define MyAppVersion "3.1.1"
+#define MyAppVersion "3.2.0"
 #define MyAppPublisher "mathewsa"
 #define MyAppExeName "Custom File Viewer.exe"
 #define AppVerName "CF Viewer"
+#define MyFileVersion "3.2.0.0"
+#define MyVersionInfoCompany "mathewsa"
+#define MyVersionInfoCopyright "Copyright (c) 2025"
 
 [Setup]
 ; NOTE: The value of AppId uniquely identifies this application. Do not use the same AppId value in installers for other applications.
@@ -13,10 +16,15 @@
 AppId={{D3328382-7A75-47C2-976A-C38B47341A63}
 AppName={#MyAppName}
 AppVersion={#MyAppVersion}
-;AppVerName={#MyAppName} {#MyAppVersion}
+AppVerName={#AppVerName}
 AppPublisher={#MyAppPublisher}
 DefaultDirName={autopf}\{#MyAppName}
 UninstallDisplayIcon={app}\{#MyAppExeName}
+VersionInfoVersion = {#MyFileVersion}
+VersionInfoCompany = {#MyVersionInfoCompany}
+VersionInfoCopyright = {#MyVersionInfoCopyright}
+
+
 ; "ArchitecturesAllowed=x64compatible" specifies that Setup cannot run
 ; on anything but x64 and Windows 11 on Arm.
 ArchitecturesAllowed=x64compatible
