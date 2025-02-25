@@ -105,3 +105,15 @@
 - Version File
 
 - Icon on installer
+
+# Changelog #
+
+## [v3.2.0] - 2025-02-25 - [Release](https://github.com/Ndkorr/TMIAPP/releases/tag/v3.2.0)
+
+### Fixes
+
+- Printing is now accurate in terms of margins
+
+### Added
+
+- Drag & Drop feature has been added
