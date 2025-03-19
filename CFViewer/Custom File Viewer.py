@@ -242,6 +242,11 @@ class CustomFileViewer(QMainWindow):
 
         # Initialize pages attribute
         self.pages = []
+        
+        # Add a drag & drop function
+        self.setAcceptDrops(True)
+        
+        
 
         # Change the window icon
         # self.setWindowIcon(QIcon('path/to/your/icon.png'))  # Change the icon
@@ -307,7 +312,20 @@ class CustomFileViewer(QMainWindow):
         self.exit_action.triggered.connect(self.close)
         self.file_menu.addAction(self.exit_action)
         
+    def dragEnterEvent(self, event):
+        if event.mimeData().hasUrls():
+            event.acceptProposedAction()
     
+    def dropEvent(self, event):
+        for url in event.mimeData().urls():
+            file_path = url.toLocalFile()
+            if file_path.endswith(".QFS"):
+                self.open_viewer_window(file_path)
+            else:
+                QMessageBox.information(self, "Invalid File", "File Not Supported")
+        event.acceptProposedAction()
+    
+        
     def print_preview(self):
         """Show a print preview dialog."""
         self.printer = QPrinter(QPrinter.HighResolution)
@@ -662,6 +680,8 @@ class CustomFileViewer(QMainWindow):
     def print_document(self):
         printer = QPrinter(QPrinter.HighResolution)
         printer.setResolution(600)  # Set high DPI for better quality
+        # set page margins
+        printer.setPageMargins(0, 0, 30, 0, QPrinter.Millimeter)
         print_dialog = QPrintDialog(printer, self)
         print_dialog.setOption(QPrintDialog.PrintPageRange)
         
@@ -704,10 +724,18 @@ class CustomFileViewer(QMainWindow):
             page_rect = printer.pageRect()
             scaled_size = pixmap.size()
             scaled_size.scale(page_rect.size(), Qt.KeepAspectRatio)
-            x = (page_rect.width() - scaled_size.width()) // 2
-            y = (page_rect.height() - scaled_size.height()) // 2
+            pixmap_size = pixmap.size()
             
-            target_rect = QRect(page_rect.x() + x, page_rect.y(), scaled_size.width(), scaled_size.height())
+            x = (page_rect.x() + (page_rect.width() - pixmap_size.width()) - 200) // 2
+            y = (page_rect.y() + (page_rect.height() - pixmap_size.height())) // 2
+            
+            if x >= 0 and x <= 1000 or y >= 0 and y <= 1000:
+                target_rect = QRect(-150, -75, pixmap_size.width(), pixmap_size.height())
+            elif x <= -0 and x >= -1000:
+                target_rect = QRect(-150, -75, pixmap_size.width(), pixmap_size.height())
+            else:
+                target_rect = QRect(x, y, pixmap_size.width(), pixmap_size.height())
+
             logging.debug(f"Drawing page {i+1}: target rect {target_rect}")
             
             painter.drawPixmap(target_rect, pixmap)
